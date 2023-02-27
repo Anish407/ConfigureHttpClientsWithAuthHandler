@@ -21,12 +21,14 @@ namespace Connect.Api.HttpClients
 
             var response = await _client.SendAsync(request,HttpCompletionOption.ResponseHeadersRead);
 
+            // Check if call was successfull 
             if (!response.IsSuccessStatusCode)
             {
                 _logger.LogError("Call Failed");
                 throw new Exception($"Status Code: {response.StatusCode}, Call failed");
             }
 
+            // read the contents as a string
             var result = await response.Content.ReadAsStringAsync();
 
             if (string.IsNullOrWhiteSpace(result))
@@ -34,6 +36,7 @@ namespace Connect.Api.HttpClients
                 return default;
             }
 
+            // deserialize the response to a type
             return JsonSerializer.Deserialize<T>(result) ?? throw new Exception("Error While deserializing");
         }
     }

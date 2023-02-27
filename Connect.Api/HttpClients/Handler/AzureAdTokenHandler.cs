@@ -21,17 +21,23 @@ namespace Connect.Api.HttpClients.Handler
 
         public async Task<string> GetAccessTokenFromAzureAd()
         {
+            // allows only 1 thread at a time
             SemaphoreSlim semaphoreSlim = new SemaphoreSlim(1);
+            // check if token exists in the cache
             var tokenModel = new TokenModel();
             tokenModel = _memoryCache.Get<TokenModel>(AzureAdMemoryCacheKey);
             if (tokenModel != null)
             {
+                // return token from cache
                 return tokenModel.AccessToken;
             }
 
             try
             {
+                // only 1 thread can enter this block at once
                 semaphoreSlim.Wait();
+
+                // check cache again
                 tokenModel = _memoryCache.Get<TokenModel>(AzureAdMemoryCacheKey);
                 if (tokenModel != null)
                 {
@@ -41,6 +47,7 @@ namespace Connect.Api.HttpClients.Handler
 
                 string[] scopes = new string[] { $"{_adTokenConfig.ClientId}/.default" };
 
+                
                 IConfidentialClientApplication app = ConfidentialClientApplicationBuilder
                     .Create(_adTokenConfig.ClientId)
                     .WithClientSecret(_adTokenConfig.ClientSecret)
@@ -48,13 +55,17 @@ namespace Connect.Api.HttpClients.Handler
                     .WithTenantId(_adTokenConfig.TenantId)
                     .Build();
 
+                // call azure ad to get the token
                 var result = await app.AcquireTokenForClient(scopes).ExecuteAsync();
+
+                // set the token in the cache
                 _memoryCache.Set(AzureAdMemoryCacheKey, new TokenModel
                 {
                     AccessToken = result.AccessToken,
                     Expiry = result.ExpiresOn
                 });
 
+                // return the access token
                 return result.AccessToken;
             }
             catch (Exception ex)
@@ -63,6 +74,7 @@ namespace Connect.Api.HttpClients.Handler
             }
             finally
             {
+                // release the lock. next thread can enter now
                 semaphoreSlim.Release();
             }
 
